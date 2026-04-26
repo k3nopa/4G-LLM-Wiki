@@ -1,9 +1,9 @@
 ---
 title: "Non-3GPP Access Architecture (TS 23.402)"
 type: concept
-tags: [non-3GPP, WLAN, WiFi, ePDG, trusted, untrusted, S2a, S2b, S2c, PMIPv6, DSMIPv6, GTP, IPMS, offload, roaming, AAA, ANDSF, QoS, identities, IP-allocation]
+tags: [non-3GPP, WLAN, WiFi, ePDG, trusted, untrusted, S2a, S2b, S2c, PMIPv6, DSMIPv6, GTP, IPMS, offload, roaming, AAA, ANDSF, QoS, identities, IP-allocation, HSS, information-storage, HRPD, S101, S103]
 sources: [ts_123402v150300p.pdf]
-updated: 2026-04-10
+updated: 2026-04-13
 ---
 
 # Non-3GPP Access Architecture
@@ -406,3 +406,149 @@ When UE is attached to EPC via multiple access systems simultaneously:
 > Preserving PDN connections requires handover to another access before the detach
 > completes on the detaching access. The sequence: PDN disconnect (non-preserved) →
 > handover (preserved PDNs) → detach.
+
+---
+
+## HSS / 3GPP AAA Server Interactions for Non-3GPP (§12)
+
+Section 12 defines the Diameter-based interactions between the **3GPP AAA Server** and
+the **HSS** (over SWx) and between the **AAA Server** and network nodes (over S6b, SWm,
+STa) for non-3GPP subscriber management.
+
+### UE Registration Notification (§12.1)
+
+When a UE successfully authenticates to a non-3GPP access, the 3GPP AAA Server
+notifies the HSS of the access registration. This allows the HSS to track which
+non-3GPP access types the UE is currently using.
+
+```mermaid
+sequenceDiagram
+    participant Non3GPP as Non-3GPP Access / ePDG
+    participant AAA as 3GPP AAA Server
+    participant HSS
+
+    Non3GPP->>AAA: EAP-Request (UE credentials, access type)
+    AAA->>HSS: SWx — Multimedia-Auth-Request (UE identity, access type)
+    HSS-->>AAA: SWx — Multimedia-Auth-Answer (AV + subscription data)
+    AAA-->>Non3GPP: EAP-Response (Auth OK)
+    AAA->>HSS: SWx — Registration-Notification (UE registered, AAA server name)
+    HSS-->>AAA: SWx — Registration-Notification-Answer
+    Note over HSS: HSS stores AAA server name per non-3GPP access type for this UE
+```
+
+### De-registration (§12.2–§12.3)
+
+Two de-registration variants:
+
+| Type | Initiator | Trigger | Effect |
+|---|---|---|---|
+| **AAA-initiated** (§12.2) | 3GPP AAA Server | UE disconnects from non-3GPP access; PDN disconnection | AAA sends Registration-Notification (Deregistration) to HSS; HSS clears AAA server record |
+| **HSS-initiated** (§12.3) | HSS | Operator action, subscription change, MME request | HSS sends Push-Notification-Request to AAA; AAA triggers detach toward ePDG/TWAN; AAA confirms with Push-Notification-Answer |
+
+### PDN GW Identity Notification (§12.4–§12.5)
+
+The PGW identity (address + APN) must be stored in the HSS/AAA so that future handovers
+can retrieve the same PGW and preserve UE IP address continuity.
+
+**§12.4 — AAA Server → HSS notification:**
+
+After PGW selection (initial non-3GPP attach), the AAA Server sends the PGW identity
+and APN to the HSS via SWx. HSS stores `{APN → PGW address}` per UE.
+
+**§12.5 — MME/SGSN cascade notification:**
+
+When an MME or SGSN assigns a PGW for the first time (3GPP attach), it notifies the
+3GPP AAA Server (S6b) which cascades to:
+- HSS (to update centralized PGW record)
+- ePDG/TWAN (if UE is simultaneously connected via non-3GPP): MAG must use same PGW
+
+```mermaid
+sequenceDiagram
+    participant MME_SGSN as MME / SGSN
+    participant SGW as S-GW
+    participant PGW as P-GW
+    participant AAA as 3GPP AAA Server
+    participant HSS
+    participant ePDG_TWAN as ePDG / TWAN
+
+    Note over MME_SGSN,PGW: UE attaches via 3GPP access; PGW selected
+    PGW->>AAA: S6b — PDN GW Identity Notification (IMSI, APN, PGW FQDN/IP)
+    AAA->>HSS: SWx — Registration-Notification (PGW identity update)
+    HSS-->>AAA: SWx — Ack
+    alt UE is simultaneously connected via non-3GPP
+        AAA->>ePDG_TWAN: SWm/STa — PDN GW Notification (new PGW identity)
+        Note over ePDG_TWAN: MAG must redirect S2b/S2a PMIPv6 binding to new PGW
+    end
+    AAA-->>PGW: S6b — Ack
+```
+
+### User Profile Update (§12.6)
+
+When the HSS subscription profile changes (e.g., QoS tier upgrade, ODB change),
+the HSS pushes the update to the 3GPP AAA Server (SWx Push-Profile-Request). The
+AAA may then re-provision the ePDG or TWAN with new policy (e.g., via SWm/STa
+Re-Auth-Request).
+
+### Provide User Profile (§12.7)
+
+The 3GPP AAA Server may request the full subscriber profile from the HSS at any time
+(e.g., after restart) using SWx Multimedia-Auth-Request. HSS returns the subscription
+data including non-3GPP-specific QoS profiles, access restrictions, and ODB flags.
+
+### Authentication Reference (§12.8)
+
+Detailed authentication procedures (EAP-AKA, EAP-AKA', EAP-SIM vectors, SWx Multimedia-Auth)
+are specified in **TS 33.402**.
+
+---
+
+## Non-3GPP Information Storage (§13)
+
+Section 13 defines per-node data that must be retained to support non-3GPP access,
+HRPD pre-registration, and handover continuity.
+
+### HSS — Non-3GPP Subscription Data
+
+Additional fields stored at HSS for non-3GPP UEs:
+
+| Field | Purpose |
+|---|---|
+| **3GPP AAA Server name (FQDN)** | Identifies which AAA server currently manages the UE's non-3GPP registration; enables HSS-initiated deregistration and profile push |
+| **QoS Profile per access type** | Per-APN QoS parameters (QCI, ARP, MBR, GBR) for trusted/untrusted non-3GPP; may differ from 3GPP QoS subscription |
+| **Operator Determined Barring (ODB) for non-3GPP** | Service restrictions applicable specifically to non-3GPP PDN connections |
+| **Access Restriction (non-3GPP)** | Indicates whether non-3GPP access is allowed; may restrict to specific access technology types |
+
+### MME — HRPD-Related Context Fields
+
+When a UE has performed HRPD pre-registration ([see procedure](../procedures/HRPD-optimized-handover.md)),
+the MME stores additional per-UE fields:
+
+| Field | Purpose |
+|---|---|
+| **S101 Source IP Address** | HRPD AN's IP address for the UE's S101 tunnel; used to route S101 signalling back to the correct AN |
+| **S103 Forwarding Address** | HS-GW address for each PDN; used to set up S103 GRE forwarding tunnels during active HO |
+| **S103 GRE Keys** (per PDN) | GRE key(s) negotiated with HS-GW for each PDN connection; identifies which PDN data belongs to on the S103 tunnel |
+
+These fields are transferred to the new MME during TAU (via S10 Context Transfer) to enable
+**S101 Tunnel Redirection** ([§9.7](../procedures/HRPD-optimized-handover.md)).
+
+### S-GW — HRPD-Related Context Fields
+
+| Field | Purpose |
+|---|---|
+| **S103 Forwarding Address** | HS-GW address for each PDN; S-GW uses this to duplicate DL packets during active HRPD HO |
+| **S103 GRE Keys** (per PDN) | GRE key used on each S103 forwarding tunnel; must match keys stored at MME and HS-GW |
+
+> **Lifetime of S103 fields:** These fields are only populated during an active HRPD handover
+> preparation phase. They are cleared when the MME sends "stop forwarding" after HO Complete
+> (step 19 of the active HO procedure).
+
+### Wild Card APN (§13.x)
+
+A **Wild Card APN** stored at the HSS/AAA allows a UE to connect to **any APN** through
+a non-3GPP access, using the PDN GW selected by the network. Used when the UE does not
+specify an APN in its attach request or when the network wants to override the requested APN.
+
+- Stored as a special subscription record in HSS
+- AAA Server returns a resolved APN to ePDG/TWAN (not the wildcard string itself)
+- Ensures that even if UE requests an APN not in subscription, a suitable PDN can be established

@@ -2,8 +2,8 @@
 title: "EMM and ECM States"
 type: concept
 tags: [EMM, ECM, mobility-management, connection-management, MME, NAS, state-machine]
-sources: [ts_123401v150400p.pdf]
-updated: 2026-04-08
+sources: [ts_123401v150400p.pdf, ts24301v170600p.pdf]
+updated: 2026-04-19
 ---
 
 # EMM and ECM States
@@ -127,6 +127,68 @@ For an IMS voice call to reach the UE:
 3. Dedicated GBR bearer established for voice media
 4. SIP signaling and RTP both flow over ECM-CONNECTED bearers
 
+---
+
+## EMM Stage-3 Detail (TS 24.301)
+
+### Full UE EMM State Set (§5.1.3.2)
+
+Beyond the two main states above, the stage-3 spec defines a rich substate structure:
+
+**EMM-DEREGISTERED substates:**
+
+| Substate | Meaning |
+|---|---|
+| NORMAL-SERVICE | Suitable cell; PLMN/TA not forbidden → initiate attach |
+| LIMITED-SERVICE | Forbidden PLMN/cell; emergency attach only |
+| ATTEMPTING-TO-ATTACH | Attach failed; waiting for T3411/T3402 expiry |
+| PLMN-SEARCH | Scanning for PLMNs |
+| NO-IMSI | No valid USIM |
+| ATTACH-NEEDED | Valid USIM; attach ASAP when access class clears |
+| NO-CELL-AVAILABLE | No E-UTRAN cell selectable |
+| eCALL-INACTIVE | eCall-only UE; awaiting eCall trigger |
+
+**EMM-REGISTERED substates:**
+
+| Substate | Meaning |
+|---|---|
+| NORMAL-SERVICE | Normal operation; TAU when conditions met |
+| ATTEMPTING-TO-UPDATE | TAU failed; no user data; retry on timer expiry |
+| LIMITED-SERVICE | Cell cannot provide normal service |
+| PLMN-SEARCH | PLMN selection underway |
+| UPDATE-NEEDED | TAU needed but access barred |
+| NO-CELL-AVAILABLE | Coverage lost or PSM active |
+| ATTEMPTING-TO-UPDATE-MM | EPS-only combined attach/TAU (non-EPS part failed) |
+| IMSI-DETACH-INITIATED | Detaching from non-EPS only (IMSI detach) |
+
+**Additional transient states (UE):**
+- `EMM-REGISTERED-INITIATED` — attach/combined attach in progress
+- `EMM-DEREGISTERED-INITIATED` — detach in progress
+- `EMM-TRACKING-AREA-UPDATING-INITIATED` — TAU in progress
+- `EMM-SERVICE-REQUEST-INITIATED` — service request in progress
+
+### MME EMM States (§5.1.3.4)
+
+| State | Meaning |
+|---|---|
+| EMM-DEREGISTERED | No EMM context or context marked detached |
+| EMM-COMMON-PROCEDURE-INITIATED | Common procedure active, awaiting UE response |
+| EMM-REGISTERED | EMM context + default bearer established |
+| EMM-DEREGISTERED-INITIATED | Network-initiated detach, awaiting DETACH ACCEPT |
+
+### EPS Update Status (§5.1.3.3)
+
+Stored on USIM (or NV memory), orthogonal to EMM state:
+
+| Value | Meaning |
+|---|---|
+| EU1: UPDATED | Last attach/TAU succeeded |
+| EU2: NOT UPDATED | Last attempt failed procedurally (no response/reject) |
+| EU3: ROAMING NOT ALLOWED | Last attempt completed but rejected (roaming restriction) |
+
+---
+
 ## Related Pages
 - [MME](../entities/MME.md) — state machine owner
 - [EPS bearer model](EPS-bearer.md)
+- [NAS EMM Protocol](../protocols/NAS-EMM-protocol.md) — stage-3 NAS details: security, UE modes, substates

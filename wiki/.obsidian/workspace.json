@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "interfaces/IMS-reference-points.md",
+                "file": "entities/MME.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "IMS-reference-points"
+              "title": "MME"
             }
           }
         ]
@@ -185,6 +185,22 @@
   },
   "active": "7dbd55c77696d6c3",
   "lastOpenFiles": [
+    "protocols/NAS-message-reference.md",
+    "procedures/NAS-ESM-procedures.md",
+    "procedures/NAS-service-request.md",
+    "procedures/NAS-TAU.md",
+    "procedures/NAS-detach.md",
+    "procedures/NAS-attach.md",
+    "sources/ts24301.md",
+    "protocols/NAS-EMM-protocol.md",
+    "concepts/CUPS-parameter-reference.md",
+    "interfaces/Sx.md",
+    "procedures/Sx-session-management.md",
+    "sources/ts23214.md",
+    "concepts/CUPS-architecture.md",
+    "interfaces/reference-points.md",
+    "overview.md",
+    "interfaces/IMS-reference-points.md",
     "log.md.tmp.392943.1775685050378",
     "index.md.tmp.392943.1775685021444",
     "index.md.tmp.392943.1775685007606",
@@ -198,10 +214,7 @@
     "procedures/EPS-attach.md",
     "procedures/EPS-attach.md.tmp.392943.1775684506741",
     "Untitled.base",
-    "interfaces/IMS-reference-points.md",
     "log.md",
-    "overview.md",
-    "index.md",
-    "log.md.tmp.348814.1775649751828"
+    "index.md"
   ]
 }

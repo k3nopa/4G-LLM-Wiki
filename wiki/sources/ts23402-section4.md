@@ -1,12 +1,12 @@
 ---
 title: "Source: TS 23.402 — Non-3GPP Access Architecture"
 type: source
-tags: [TS-23.402, non-3GPP, WLAN, ePDG, trusted, untrusted, S2a, S2b, S2c, PMIPv6, DSMIPv6, GTP, IPMS, AAA, roaming]
+tags: [TS-23.402, non-3GPP, WLAN, ePDG, trusted, untrusted, S2a, S2b, S2c, PMIPv6, DSMIPv6, GTP, IPMS, AAA, roaming, HRPD, S101, S103, TWAN]
 sources: [ts_123402v150300p.pdf]
-updated: 2026-04-10
+updated: 2026-04-13
 ---
 
-# Source: 3GPP TS 23.402 v15.3.0 — IN PROGRESS (§5–§6, §8+ remaining)
+# Source: 3GPP TS 23.402 v15.3.0 — COMPLETE
 
 **Full title:** Architecture enhancements for non-3GPP accesses
 **Version:** 15.3.0 (Release 15)
@@ -152,7 +152,42 @@ Configurable via H-ANDSF/USIM. Single ePDG per UE for all PDN connections.
 
 ---
 
+## §9–§13 (chunk ts23402-6)
+
+**§9 — HRPD optimized handover:** S101 (MME↔HRPD AN) and S103 (S-GW↔HS-GW) reference points for E-UTRAN↔CDMA2000 HRPD. Pre-registration 9-step (UE registers to HRPD while in E-UTRAN over S101 tunnel; EAP-AKA auth; Gateway Control Session at HS-GW; S101 Session ID assigned). Active HO 19-step (measurements → S103 GRE key allocation → DL forwarding tunnel pre-established → HS-GW Proxy Binding Update with all-zero CoA to PGW → A11 signalling → UE acquires HRPD radio → PGW redirects to HS-GW → HO Complete → MME stops S103 forwarding). Idle-mode mobility 8-step (ECM-IDLE reselects to HRPD; A11 Reg Req; HS-GW fetches PGW identity from AAA; PMIP BU/BA; PCEF IP-CAN Modification; E-UTRAN resource deactivation). S101 Tunnel Redirection (§9.7): new MME sends Notification Request (Redirection) to HRPD AN with new MME address; HRPD pre-registration state preserved.
+
+**§10 — WiMAX HO:** ANDSF-driven dual-radio HO principles; uses S2a/S2c procedures; no dedicated procedure flows.
+
+**§11 — Empty** (no normative content).
+
+**§12 — HSS/AAA interactions:** UE Registration Notification (AAA→HSS after EAP-AKA success); AAA-initiated De-registration (after PDN disconnect); HSS-initiated De-registration (Push-Notification-Request to AAA); PDN GW Identity Notification from AAA (§12.4) and from MME/SGSN cascade (§12.5; MUST notify ePDG/TWAN if simultaneously connected); User Profile Update (HSS pushes profile change to AAA via SWx); Provide User Profile (AAA requests profile from HSS); Authentication per TS 33.402.
+
+**§13 — Information Storage:** HSS non-3GPP fields: 3GPP AAA Server name (FQDN per UE), QoS Profile per access type per APN, ODB for non-3GPP, Access Restriction. MME HRPD fields: S101 Source IP per UE (HRPD AN address), S103 Forwarding Address per UE per PDN (HS-GW address), S103 GRE Keys per PDN. S-GW HRPD fields: S103 Forwarding Address + GRE keys per PDN (cleared after HO Complete). Wild Card APN.
+
+## §13.5–§13.6 + §15 (chunk ts23402-7, additional)
+
+§13.5 ePDG Emergency Configuration Data: Emergency APN name, Emergency QoS profile (QCI+ARP), Emergency APN-AMBR, Emergency PDN GW identity (statically configured FQDN or IP), Emergency fallback PDN GW identity (optional). Used by ePDG instead of UE subscription data for all emergency bearer services. §13.6 TWAN Emergency Configuration Data: same 5 fields as §13.5; used by TWAN instead of HSS subscription data for emergency attach.
+
+§14: Void.
+
+§15.1 S2c Bootstrapping via DSMIPv6 Home Link: When UE is already attached to a 3GPP PDN (step 0), UE may establish an S2c IKEv2 SA to the PGW to prepare for future non-3GPP handover. Steps: (1) UE discovers PGW FQDN/address (§4.5.2); (2) IKEv2 SA establishment between UE and PGW + IPv6 Home Address allocation (EAP auth with 3GPP AAA; AAA registers with HSS); (3) Home Link Detection confirms UE is on home link for this PDN. Must be done once per PDN connection. If PGW reallocation needed, §6.10 applies.
+
+## §16 TWAN (chunk ts23402-7)
+
+§16.1 Architecture: TWAN = WLAN AN (802.11 APs) + TWAG (S2a termination, GTP or PMIP) + TWAP (STa relay). Three connection modes: TSCM (transparent, default APN, no WLCP), SCM (single PDN/NSWO via EAP-AKA'), MCM (multiple PDN + NSWO via WLCP). Mode negotiated via EAP-AKA' extensions (§16.1.4A.1–A.2). WLCP (§16.1.4A.3.1): UE↔TWAG control protocol over DTLS/UDP/IP on SWw; carries PDN Connection ID (TWAG-allocated MAC address), APN, PDN type, TFT, Bearer QoS, handover indicator. Bearer model: TSCM/SCM single point-to-point; MCM one WLCP bearer per S2a bearer 1:1. TWAN Identifier (§16.1.7): SSID + BSSID or civic address; reported over S2a/Gx/Gy for NPLI.
+
+§16.2.1 Initial Attach GTP S2a (15-step): L2/L3 trigger (Scenario A=L2 recommended; Scenario B=DHCPv4); EAP-AKA' auth with mode negotiation; IMEI check via EIR; Create Session Request (IMSI, APN, RAT=TWAN, TWAN Identifier, UE Time Zone); IP-CAN Session Establishment; Update PDN GW Address; Create Session Response; GTP tunnel; EAP Completion (SCM only: delivers PDN addr, TWAG MAC); L3 config; MCM → §16.8 WLCP procedures. §16.2.2 PMIP S2a variant: PBU(TWAN Identifier, IMEI(SV)) / PBA. §16.2.3 HSS retrieval of UE info from TWAN: HSS→AAA→TWAN→AAA→HSS (fetches TWAN ID + UE Time Zone for IMS AS).
+
+§16.3 Detach (SCM): UE/TWAN-initiated GTP 6-step (Delete Session Request includes TWAN ID, Timestamp, UE Time Zone; PGW notifies AAA; PCEF IP-CAN Termination; Delete Session Response; L2 deassociation). HSS/AAA-initiated: Session Termination → steps 2-6 → Ack. PMIP variants: PBU(lifetime=0) / PBA patterns.
+
+§16.4 PGW-initiated bearer deactivation: GTP 8-step (PCRF → Delete Bearer Request → MCM WLCP PDN/Bearer Disconnect ↔ UE → Delete Bearer Response including TWAN ID → Update PDN GW Address → PCEF IP-CAN Modification). PMIP: Binding Revocation Request/Ack. §16.5 Dedicated bearer activation GTP: PCRF → Create Bearer Request → MCM WLCP Bearer Creation Request↔UE → Create Bearer Response (EPS Bearer Identity + TWAN TEID; Charging ID reuse for HO from 3GPP). §16.6 Bearer modification: PGW-initiated Update Bearer Request → MCM WLCP Bearer Update; HSS-initiated via Modify Bearer Command → PCRF → Update Bearer Request.
+
+§16.7 MCM detach: Steps 2-5 (Delete Session) repeated per PDN; PMIP = PBU(lifetime=0) per PDN. §16.8 UE-initiated PDN connectivity MCM GTP 7-step: WLCP PDN Connection Request(APN, PDN type, Multiple Bearer Capability Indicator) → Create Session Request → IP-CAN Session Establishment → Update PDN GW Address → Create Session Response → GTP tunnel → WLCP PDN Connection Response(PDN Connection ID=TWAG MAC, PDN addr). PMIP variant: PBU/PBA. §16.9 MCM PDN disconnection GTP 9-step: WLCP PDN Disconnection Request(PDN Connection ID) → Delete Session → IP-CAN Termination → WLCP PDN Disconnection Response ↔ UE. PMIP: PBU(lifetime=0)/PBA.
+
+§16.10 Handover from 3GPP to TWAN: SCM GTP 11-step (Handover Indication in Create Session Request → PCEF IP-CAN Modification preserves IP → GTP tunnel → EAP Completion delivers IP; same Charging ID; PGW deactivates 3GPP bearers step 11). MCM 6-step (EAP auth MCM + HO → WLCP PDN Connection per PDN with Request Type=Handover → PGW deactivates 3GPP bearers). §16.11 Handover TWAN to 3GPP: follows §8.2.1.x with GTP/PMIP S2a as source; TWAN resource deactivation via §16.4; Charging ID transferred to 3GPP bearers.
+
+§17 E-UTRAN-HRPD Inter-RAT SON Support: S121 reference point (MME↔HRPD AN, S121-AP/UDP); MME relays RIM messages transparently between S1 (eNB) and S121 (HRPD AN); enables SON neighbor list optimization across heterogeneous RATs.
+
 ## Coverage Status
 
-**IN PROGRESS** — §4.1–§4.13 complete (chunks 3b-1, 3b-2). §5.1–§5.13 complete (chunk 3b-5). §6.1–§6.8 complete (chunk 3b-4). §7.1–§7.11 complete (chunks 3b-2, 3b-3). §8.1–§8.2 complete (chunk 3b-3).
-Remaining: §9–§16 (additional procedures, HRPD, TWAN multi-connection, etc.).
+**COMPLETE** — §4.1–§4.13 (chunks 3b-1, 3b-2), §5.1–§5.13 (chunk 3b-5), §6.1–§6.8 (chunk 3b-4), §7.1–§7.11 (chunks 3b-2, 3b-3), §8.1–§8.2 (chunk 3b-3), §9–§13 (chunk ts23402-6), §13.5–§13.6 + §15 + §16 + §17 (chunk ts23402-7). All normative sections ingested.

@@ -1,9 +1,9 @@
 ---
 title: "IMS Reference Points (Interfaces)"
 type: interface
-tags: [IMS, interfaces, Gm, Mw, ISC, Cx, Sh, Mr, Mp, Mi, Mj, Mk, Rx, Ut, SIP, Diameter]
-sources: [ts_123228v150600p.pdf]
-updated: 2026-04-08
+tags: [IMS, interfaces, Gm, Mw, ISC, Cx, Sh, Mr, Mp, Mi, Mj, Mk, Rx, Ut, Ici, Izi, Mx, II-NNI, SIP, Diameter]
+sources: [ts_123228v150600p.pdf, ts_129165v160600p.pdf, ts_123237v180000p.pdf]
+updated: 2026-04-18
 ---
 
 # IMS Reference Points
@@ -24,12 +24,17 @@ updated: 2026-04-08
 | **Mi** | S-CSCF → BGCF | SIP | Control | Route IMS-originated session toward PSTN |
 | **Mj** | BGCF → MGCF | SIP | Control | Local PSTN breakout: BGCF routes to MGCF |
 | **Mk** | BGCF ↔ BGCF | SIP | Control | Inter-network BGCF routing for remote PSTN breakout |
-| **Mx** | BGCF ↔ IMS-ALG (IBT) | SIP | Control | Route toward external IP multimedia network |
+| **Mx** | BGCF / CSCF / ATCF / MSC Server enhanced for ICS/SRVCC/dual radio ↔ [IBCF](../entities/IBCF.md) | SIP | Control | Internal IMS network signalling toward/from IBCF (the II-NNI border element) |
+| **Ici** | [IBCF](../entities/IBCF.md) ↔ [IBCF](../entities/IBCF.md) (peer network) | SIP | Control | **II-NNI control plane** — SIP signalling between two IM CN subsystems |
+| **Izi** | [TrGW](../entities/TrGW.md) ↔ [TrGW](../entities/TrGW.md) (peer network) | RTP/UDP | User | **II-NNI user plane** — media streams between two IM CN subsystems |
 | **Mr** | S-CSCF or AS ↔ MRFC | SIP | Control | Request conference/announcement media resources |
 | **Mp** | MRFC → MRFP | H.248 (MEGACO) | Control | MRFC controls MRFP: create/modify/delete media connections |
 | **Ma** | I-CSCF → AS | SIP | Control | Direct termination to AS (certain scenarios, bypasses S-CSCF assignment) |
 | **Mm** | IMS ↔ external IP network | SIP | Control | External SIP network interworking (e.g. between operators) |
 | **Ut** | UE ↔ AS | HTTP(S)/XCAP | Control | Subscriber-managed AS configuration (call forwarding targets, barring) |
+| **Iq** | [ATCF](../entities/ATCF.md) ↔ [ATGW](../entities/ATGW.md) | H.248 / proprietary | Control | ATCF controls ATGW when ATCF is co-located with P-CSCF (per TS 23.334) |
+| **Ix** | [ATCF](../entities/ATCF.md) ↔ [ATGW](../entities/ATGW.md) | H.248 / proprietary | Control | ATCF controls ATGW when ATCF is co-located with IBCF (per TS 29.162) |
+| **I2** | [ATCF](../entities/ATCF.md) ↔ MSC Server (ICS-enhanced) | SIP | Control | ATCF ↔ ICS-capable MSC Server for SRVCC and CS-to-PS SRVCC; also used for CS-to-PS direction |
 
 ---
 
@@ -110,4 +115,9 @@ SDP in INVITE ──► P-CSCF ──Rx AAR──► PCRF ──Gx RAR──► 
 - [MRF](../entities/MRF.md)
 - [HSS](../entities/HSS.md)
 - [PCRF](../entities/PCRF.md) — Rx peer
+- [IBCF](../entities/IBCF.md) — II-NNI control-plane border element
+- [TrGW](../entities/TrGW.md) — II-NNI user-plane border element
+- [ATCF](../entities/ATCF.md) — Access Transfer Control Function (Iq/Ix/I2 interfaces)
+- [ATGW](../entities/ATGW.md) — Access Transfer Gateway (Iq/Ix interfaces)
+- [II-NNI Interface](II-NNI.md) — full Ici/Izi specification
 - [EPC Reference Points](reference-points.md)

@@ -1,9 +1,9 @@
 ---
 title: "IM Call Model: S-CSCF Service Architecture, iFC, and SPTs"
 type: concept
-tags: [IMS, S-CSCF, iFC, SPT, filter-criteria, AS, ISC, ICSI, IARI, call-model, transit-function, ODI, registration]
-sources: [ts_123218v170000p.pdf]
-updated: 2026-04-10
+tags: [IMS, S-CSCF, iFC, SPT, filter-criteria, AS, ISC, ICSI, IARI, call-model, transit-function, ODI, registration, CNF, DNF, XML-schema, Cx]
+sources: [ts_123218v170000p.pdf, ts_129228v180000p.pdf]
+updated: 2026-04-17
 ---
 
 # IM Call Model: S-CSCF Service Architecture, iFC, and SPTs
@@ -509,6 +509,197 @@ of TS 23.218 (Release 17). Only initial filter criteria (iFC) are operative.
 
 Authentication data is sent by HSS to S-CSCF via Cx during registration. Definition
 in TS 23.008; handling in TS 33.203.
+
+---
+
+## 18. TriggerPoint CNF/DNF Logic (TS 29.228 Annex C)
+
+The `TriggerPoint` element contains 1..n `ServicePointTrigger` (SPT) elements. The `ConditionTypeCNF` boolean controls how the `Group` attribute on each SPT forms the boolean expression.
+
+### CNF — Conjunctive Normal Form (`ConditionTypeCNF = TRUE`)
+
+The overall condition is an **AND of OR-clauses**. Each unique `Group` integer identifies one OR-clause. SPTs sharing the same Group value are **OR'd**; the result clauses are **AND'd** together.
+
+```
+Result = (Group-1 SPTs ORed) AND (Group-2 SPTs ORed) AND ... AND (Group-N SPTs ORed)
+```
+
+**XML example** — trigger = "(RequestURI matches sip:service) AND (Method=INVITE OR SDP has audio)":
+
+```xml
+<TriggerPoint>
+  <ConditionTypeCNF>1</ConditionTypeCNF>
+  <!-- Group 1: single SPT → evaluates to (RequestURI = sip:service) -->
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>1</Group>
+    <RequestURI>sip:service@example.com</RequestURI>
+  </SPT>
+  <!-- Group 2: two SPTs OR'd → (Method=INVITE) OR (SDP audio present) -->
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>2</Group>
+    <SIPHeader>
+      <Header>CSeq</Header>
+      <Content>.*INVITE</Content>
+    </SIPHeader>
+  </SPT>
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>2</Group>
+    <SessionDescription>
+      <Line>m</Line>
+      <Content>audio .*</Content>
+    </SessionDescription>
+  </SPT>
+</TriggerPoint>
+```
+
+### DNF — Disjunctive Normal Form (`ConditionTypeCNF = FALSE`)
+
+The overall condition is an **OR of AND-clauses**. Each unique `Group` integer identifies one AND-clause. SPTs sharing the same Group value are **AND'd**; the result clauses are **OR'd** together.
+
+```
+Result = (Group-1 SPTs ANDed) OR (Group-2 SPTs ANDed) OR ... OR (Group-N SPTs ANDed)
+```
+
+**XML example** — trigger = "(RequestURI=sip:service AND Method=INVITE) OR (RequestURI=sip:service AND SDP=audio)":
+
+```xml
+<TriggerPoint>
+  <ConditionTypeCNF>0</ConditionTypeCNF>
+  <!-- Group 1: two SPTs AND'd → (URI = service) AND (Method=INVITE) -->
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>1</Group>
+    <RequestURI>sip:service@example.com</RequestURI>
+  </SPT>
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>1</Group>
+    <SIPHeader>
+      <Header>CSeq</Header>
+      <Content>.*INVITE</Content>
+    </SIPHeader>
+  </SPT>
+  <!-- Group 2: two SPTs AND'd → (URI = service) AND (SDP audio) -->
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>2</Group>
+    <RequestURI>sip:service@example.com</RequestURI>
+  </SPT>
+  <SPT>
+    <ConditionNegated>0</ConditionNegated>
+    <Group>2</Group>
+    <SessionDescription>
+      <Line>m</Line>
+      <Content>audio .*</Content>
+    </SessionDescription>
+  </SPT>
+</TriggerPoint>
+```
+
+### Summary Table
+
+| `ConditionTypeCNF` | Form | Group semantics | Clause combination |
+|---|---|---|---|
+| `TRUE` (1) | CNF | Same Group → OR'd together | Groups AND'd |
+| `FALSE` (0) | DNF | Same Group → AND'd together | Groups OR'd |
+
+The two examples above express the same logical trigger ("URI matches AND (INVITE OR audio)") in equivalent CNF and DNF forms.
+
+---
+
+## 19. SPT Matching Rules (TS 29.228 Annex F, normative)
+
+These rules define exactly how S-CSCF evaluates each SPT subtype against the incoming SIP message.
+
+### General Pre-processing
+
+Before any SPT matching:
+1. Remove **SWS** (Slash White Space) and fold **LWS** (Linear White Space) to a single SP character (per SIP grammar, RFC 3261)
+2. Canonicalize `tel:` URI parameters before comparison
+
+### Request-URI SPT
+
+- Match field: the full **Request-URI** string of the SIP request
+- Algorithm: **ERE** (Extended Regular Expression) match of the `RequestURI` value against the normalised Request-URI
+- ERE semantics per POSIX IEEE 1003.1-2008
+
+### SIP-Header SPT
+
+The `SIP-Header` SPT has two sub-fields:
+- `Header`: the header field name to inspect
+- `Content`: the ERE pattern to match against the header value
+
+Matching rules:
+- The SPT evaluates the header against **each header instance** individually. If the request contains multiple instances of the same header (e.g., multiple `Route:` headers), the SPT fires if **any one** matches.
+- If `Content` is absent: SPT matches if the named header is **present** in the message (presence check only).
+- ERE is applied to the normalised (SWS/LWS-folded) header value.
+
+### Session-Description SPT
+
+- `Line`: the SDP line type character (e.g. `m`, `a`, `c`)
+- `Content`: ERE pattern to match against the value of that SDP line
+- Matches if **any** SDP line of the specified type matches the ERE.
+
+### SIP-Method SPT
+
+- Exact string match against the SIP method name (e.g., `INVITE`, `REGISTER`, `MESSAGE`)
+- Case-sensitive
+
+### RegistrationType SPT (within SIP-Method=REGISTER only)
+
+| Value | Name | Description |
+|---|---|---|
+| 0 | INITIAL | Initial registration (no existing binding for the IMPU) |
+| 1 | RE-REGISTRATION | Re-registration (extends or modifies an existing binding) |
+| 2 | DE-REGISTRATION | De-registration (Contact: \*; Expires: 0) |
+
+- Multiple `RegistrationType` values in one SPT = **OR** semantics (fires if any one matches)
+- Only meaningful when the containing FC already matches `SIP-Method = REGISTER`
+- If S-CSCF does not support RegistrationType: SPT matches **all** REGISTER messages regardless of type
+
+### Session-Case (DirectionOfRequest) SPT
+
+| Value | Name |
+|---|---|
+| 0 | ORIGINATING_REGISTERED |
+| 1 | TERMINATING_REGISTERED |
+| 2 | TERMINATING_UNREGISTERED |
+| 3 | ORIGINATING_UNREGISTERED |
+| 4 | ORIGINATING_CDIV (Call Diversion) |
+
+---
+
+## 20. Cx User-Data XML Schema — Enumerated Types (TS 29.228 Annex E, normative)
+
+The normative XML schema (`IMS-subscription` root element) defines the following key simple types:
+
+### Table E.1 — Simple Type Enumerations
+
+| Type Name | Values | Description |
+|---|---|---|
+| `tIdentityType` | 0=DISTINCT_PUBLIC_USER_IDENTITY, 1=DISTINCT_PSI, 2=WILDCARDED_PSI, 3=NON_DISTINCT_IMPU, 4=WILDCARDED_IMPU | Type of a `PublicIdentity` entry |
+| `tDirectionOfRequest` | 0=ORIGINATING_REGISTERED, 1=TERMINATING_REGISTERED, 2=TERMINATING_UNREGISTERED, 3=ORIGINATING_UNREGISTERED, 4=ORIGINATING_CDIV | SessionCase enum for Session-Case SPT |
+| `tDefaultHandling` | 0=SESSION_CONTINUED, 1=SESSION_TERMINATED | Action if AS fails |
+| `tRegistrationType` | 0=INITIAL_REGISTRATION, 1=RE_REGISTRATION, 2=DE_REGISTRATION | REGISTER sub-type |
+| `tServicePriorityLevel` | 0=highest priority, 4=lowest priority | Priority Service level (integers 0–4) |
+| `tProfilePartIndicator` | 0=REGISTERED, 1=UNREGISTERED | Which registration state the iFC applies to (absent = Common Part) |
+
+### Extension Chain (PublicIdentity backward compatibility)
+
+The XML schema uses an extension chain to add fields without breaking older S-CSCFs that parse up to Extension N-1:
+
+```
+tPublicIdentityExtension      → IdentityType, WildcardedPSI
+  └─ Extension2               → DisplayName, AliasIdentityGroupId
+       └─ Extension3          → WildcardedIMPU, ServiceLevelTraceInfo, ServicePriorityLevel
+            └─ Extension4     → ExtendedPriority (0..n): PriorityNamespace + PriorityLevel
+                 └─ Extension5 → MaxNumOfAllowedSimultRegistrations
+```
+
+Each Extension inherits the parent and adds new optional elements. Older nodes that cannot parse Extension N+1 simply ignore the unknown child elements — the base element is always valid.
 
 ---
 
